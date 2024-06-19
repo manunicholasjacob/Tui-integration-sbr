@@ -4,12 +4,8 @@ def run_command(command):
     result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, text=True)
     return result.stdout.strip()
 
-def parse_pci_tree():
-    # Get the output of lspci -t which shows the PCI hierarchy
-    pci_tree = run_command("lspci -t")
-
-    # Split the tree into lines
-    lines = pci_tree.split('\n')
+def parse_pci_tree(pci_tree_output):
+    lines = pci_tree_output.split('\n')
 
     # Initialize a dictionary to hold the hierarchy
     pci_hierarchy = {}
@@ -55,9 +51,21 @@ def find_upstream_downstream_bdfs(bdf, pci_hierarchy):
     return upstream, downstream
 
 # Example usage
-bdf = "00:1f.2"
-pci_hierarchy = parse_pci_tree()
-upstream, downstream = find_upstream_downstream_bdfs(bdf, pci_hierarchy)
+def main():
+    # Run the lspci -t command
+    pci_tree_output = run_command("lspci -t")
 
-print(f"The upstream port of BDF {bdf} is {upstream}")
-print(f"The downstream ports of BDF {bdf} are {downstream}")
+    # Parse the PCI tree output
+    pci_hierarchy = parse_pci_tree(pci_tree_output)
+
+    # Specify the BDF you want to check
+    bdf = "00:1f.2"  # Replace with your BDF
+
+    # Find upstream and downstream BDFs
+    upstream, downstream = find_upstream_downstream_bdfs(bdf, pci_hierarchy)
+
+    print(f"The upstream port of BDF {bdf} is {upstream}")
+    print(f"The downstream ports of BDF {bdf} are {downstream}")
+
+if __name__ == "__main__":
+    main()
