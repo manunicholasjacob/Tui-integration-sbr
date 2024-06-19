@@ -5,26 +5,45 @@ def run_command(command):
     return result.stdout.strip()
 
 def get_upstream_port(bdf):
-    # Get the output of lspci -t which shows the PCI hierarchy
-    pci_tree = run_command("lspci -t")
+    # Get the output of lspci -tv which shows the PCI hierarchy
+    pci_tree = run_command("lspci -tv")
 
     # Split the tree into lines
     lines = pci_tree.split('\n')
 
-    # Search for the BDF in the tree
-    upstream_port = None
+    # Initialize variables to track current upstream port
+    current_parent = None
+    bdf_found = False
+
     for line in lines:
-        if bdf in line:
-            # Split the line into parts to find the upstream port
-            parts = line.split('-')
-            for i in range(len(parts)):
-                if bdf in parts[i]:
-                    if i > 0:
-                        upstream_port = parts[i-1].strip()
+        # Check for indentation level by counting leading whitespace
+        indent_level = len(line) - len(line.lstrip())
+        
+        # Extract BDF from the line
+        if '[' in line and ']' in line:
+            parts = line.split('[')
+            bdf_in_line = parts[1].split(']')[0]
+
+            if bdf_found:
+                # If we found the target BDF and this line has a higher indentation, it means we are still in its subtree
+                if indent_level > target_indent:
+                    # This is a downstream device
+                    continue
+                else:
+                    # We are out of the target BDF subtree, so break the loop
                     break
-            break
-    
-    return upstream_port
+
+            if bdf_in_line == bdf:
+                bdf_found = True
+                target_indent = indent_level
+                # The parent found before this BDF in the same indent level is the upstream port
+                return current_parent
+
+        if not bdf_found:
+            # Update the current parent (upstream) BDF if we have not yet found the target BDF
+            current_parent = bdf_in_line
+
+    return None
 
 # Example usage
 bdf = "00:1f.2"
