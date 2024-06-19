@@ -4,48 +4,60 @@ def run_command(command):
     result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, text=True)
     return result.stdout.strip()
 
-def get_upstream_port(bdf):
-    # Get the output of lspci -tv which shows the PCI hierarchy
-    pci_tree = run_command("lspci -tv")
+def parse_pci_tree():
+    # Get the output of lspci -t which shows the PCI hierarchy
+    pci_tree = run_command("lspci -t")
 
     # Split the tree into lines
     lines = pci_tree.split('\n')
 
-    # Initialize variables to track current upstream port
-    current_parent = None
-    bdf_found = False
+    # Initialize a dictionary to hold the hierarchy
+    pci_hierarchy = {}
+
+    # Initialize a stack to keep track of the current path in the tree
+    stack = []
 
     for line in lines:
-        # Check for indentation level by counting leading whitespace
-        indent_level = len(line) - len(line.lstrip())
-        
-        # Extract BDF from the line
-        if '[' in line and ']' in line:
-            parts = line.split('[')
-            bdf_in_line = parts[1].split(']')[0]
+        # Calculate the depth of the current line
+        depth = line.count('\t')
 
-            if bdf_found:
-                # If we found the target BDF and this line has a higher indentation, it means we are still in its subtree
-                if indent_level > target_indent:
-                    # This is a downstream device
-                    continue
-                else:
-                    # We are out of the target BDF subtree, so break the loop
-                    break
+        # Extract the BDF from the line
+        bdf = line.strip().split(' ')[0]
 
-            if bdf_in_line == bdf:
-                bdf_found = True
-                target_indent = indent_level
-                # The parent found before this BDF in the same indent level is the upstream port
-                return current_parent
+        # Maintain the stack to represent the hierarchy
+        while len(stack) > depth:
+            stack.pop()
 
-        if not bdf_found:
-            # Update the current parent (upstream) BDF if we have not yet found the target BDF
-            current_parent = bdf_in_line
+        if len(stack) > 0:
+            parent = stack[-1]
+            if parent not in pci_hierarchy:
+                pci_hierarchy[parent] = []
+            pci_hierarchy[parent].append(bdf)
 
-    return None
+        stack.append(bdf)
+
+    return pci_hierarchy
+
+def find_upstream_downstream_bdfs(bdf, pci_hierarchy):
+    upstream = None
+    downstream = []
+
+    # Find the upstream BDF
+    for parent, children in pci_hierarchy.items():
+        if bdf in children:
+            upstream = parent
+            break
+
+    # Find the downstream BDFs
+    if bdf in pci_hierarchy:
+        downstream = pci_hierarchy[bdf]
+
+    return upstream, downstream
 
 # Example usage
 bdf = "00:1f.2"
-upstream_port = get_upstream_port(bdf)
-print(f"The upstream port of BDF {bdf} is {upstream_port}")
+pci_hierarchy = parse_pci_tree()
+upstream, downstream = find_upstream_downstream_bdfs(bdf, pci_hierarchy)
+
+print(f"The upstream port of BDF {bdf} is {upstream}")
+print(f"The downstream ports of BDF {bdf} are {downstream}")
