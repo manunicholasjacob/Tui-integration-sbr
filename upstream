@@ -4,70 +4,35 @@ def run_command(command):
     result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, text=True)
     return result.stdout.strip()
 
-def parse_pci_tree(pci_tree_output):
-    lines = pci_tree_output.split('\n')
+def get_all_bdfs():
+    # Run lspci to get all BDFs
+    pci_output = run_command("lspci")
+    bdfs = []
+    for line in pci_output.split('\n'):
+        if line:
+            bdf = line.split(' ')[0]
+            bdfs.append(bdf)
+    return bdfs
 
-    # Initialize a dictionary to hold the hierarchy
-    pci_hierarchy = {}
+def modify_hex_last_digit(hex_str):
+    return hex_str[:-1] + '0'
 
-    # Initialize a stack to keep track of the current path in the tree
-    stack = []
+def process_bdfs(bdfs):
+    for bdf in bdfs:
+        try:
+            command = f"setpci -s {bdf} CAP_EXP+0x08.w"
+            output = run_command(command)
+            if output:
+                print(f"BDF: {bdf}, Original: {output}, Modified: {modify_hex_last_digit(output)}")
+        except Exception as e:
+            print(f"Error processing BDF {bdf}: {e}")
 
-    for line in lines:
-        # Calculate the depth of the current line
-        depth = line.count('\t')
-
-        # Extract the BDF from the line
-        parts = line.strip().split(' ')
-        if parts:
-            bdf = parts[0]
-
-            # Maintain the stack to represent the hierarchy
-            while len(stack) > depth:
-                stack.pop()
-
-            if len(stack) > 0:
-                parent = stack[-1]
-                if parent not in pci_hierarchy:
-                    pci_hierarchy[parent] = []
-                pci_hierarchy[parent].append(bdf)
-
-            stack.append(bdf)
-
-    return pci_hierarchy
-
-def find_upstream_downstream_bdfs(bdf, pci_hierarchy):
-    upstream = None
-    downstream = []
-
-    # Find the upstream BDF
-    for parent, children in pci_hierarchy.items():
-        if bdf in children:
-            upstream = parent
-            break
-
-    # Find the downstream BDFs
-    if bdf in pci_hierarchy:
-        downstream = pci_hierarchy[bdf]
-
-    return upstream, downstream
-
-# Example usage
 def main():
-    # Run the lspci -t command
-    pci_tree_output = run_command("lspci -t")
-
-    # Parse the PCI tree output
-    pci_hierarchy = parse_pci_tree(pci_tree_output)
-
-    # Specify the BDF you want to check
-    bdf = "49:00.0"  # Replace with your BDF
-
-    # Find upstream and downstream BDFs
-    upstream, downstream = find_upstream_downstream_bdfs(bdf, pci_hierarchy)
-
-    print(f"The upstream port of BDF {bdf} is {upstream}")
-    print(f"The downstream ports of BDF {bdf} are {downstream}")
+    # Get all BDFs
+    bdfs = get_all_bdfs()
+    
+    # Process each BDF
+    process_bdfs(bdfs)
 
 if __name__ == "__main__":
     main()
