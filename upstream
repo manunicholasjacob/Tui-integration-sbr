@@ -1,0 +1,32 @@
+import subprocess
+
+def run_command(command):
+    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, text=True)
+    return result.stdout.strip()
+
+def get_upstream_port(bdf):
+    # Get the output of lspci -t which shows the PCI hierarchy
+    pci_tree = run_command("lspci -t")
+
+    # Split the tree into lines
+    lines = pci_tree.split('\n')
+
+    # Search for the BDF in the tree
+    upstream_port = None
+    for line in lines:
+        if bdf in line:
+            # Split the line into parts to find the upstream port
+            parts = line.split('-')
+            for i in range(len(parts)):
+                if bdf in parts[i]:
+                    if i > 0:
+                        upstream_port = parts[i-1].strip()
+                    break
+            break
+    
+    return upstream_port
+
+# Example usage
+bdf = "00:1f.2"
+upstream_port = get_upstream_port(bdf)
+print(f"The upstream port of BDF {bdf} is {upstream_port}")
