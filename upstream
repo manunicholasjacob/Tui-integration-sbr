@@ -18,19 +18,21 @@ def parse_pci_tree(pci_tree_output):
         depth = line.count('\t')
 
         # Extract the BDF from the line
-        bdf = line.strip().split(' ')[0]
+        parts = line.strip().split(' ')
+        if parts:
+            bdf = parts[0]
 
-        # Maintain the stack to represent the hierarchy
-        while len(stack) > depth:
-            stack.pop()
+            # Maintain the stack to represent the hierarchy
+            while len(stack) > depth:
+                stack.pop()
 
-        if len(stack) > 0:
-            parent = stack[-1]
-            if parent not in pci_hierarchy:
-                pci_hierarchy[parent] = []
-            pci_hierarchy[parent].append(bdf)
+            if len(stack) > 0:
+                parent = stack[-1]
+                if parent not in pci_hierarchy:
+                    pci_hierarchy[parent] = []
+                pci_hierarchy[parent].append(bdf)
 
-        stack.append(bdf)
+            stack.append(bdf)
 
     return pci_hierarchy
 
@@ -59,7 +61,7 @@ def main():
     pci_hierarchy = parse_pci_tree(pci_tree_output)
 
     # Specify the BDF you want to check
-    bdf = "00:1f.2"  # Replace with your BDF
+    bdf = "49:00.0"  # Replace with your BDF
 
     # Find upstream and downstream BDFs
     upstream, downstream = find_upstream_downstream_bdfs(bdf, pci_hierarchy)
